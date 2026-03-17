@@ -1,0 +1,8 @@
+node_modules/
+.idea/
+.vscode/
+*.log
+.DS_Store
+
+# build output (optional, depending on preference, but usually main.js is committed for Obsidian plugins)
+# We will NOT ignore main.js, styles.css, manifest.json, and versions.json for Obsidian plugins
