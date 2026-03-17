@@ -1,0 +1,26 @@
+{
+  "name": "obsidian-digital-garden-treemap",
+  "version": "1.0.0",
+  "description": "Premium Treemap for Obsidian",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit && node esbuild.config.mjs production"
+  },
+  "keywords": [],
+  "author": "Antigravity",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "@types/node": "^16.11.21",
+    "builtin-modules": "^5.0.0",
+    "esbuild": "0.20.1",
+    "obsidian": "latest",
+    "tslib": "2.4.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "d3": "^7.8.5"
+  }
+}

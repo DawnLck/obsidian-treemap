@@ -1,0 +1,25 @@
+{
+  "showHeatmap": true,
+  "palette": "custom",
+  "baseColor": "#a6a6a6",
+  "freshColor": "#00cc33",
+  "growthColor": "#c2c2c2",
+  "excludedFolders": [
+    {
+      "value": "coze",
+      "mode": "keyword"
+    },
+    {
+      "value": "少楠",
+      "mode": "keyword"
+    },
+    {
+      "value": "daily",
+      "mode": "path"
+    }
+  ],
+  "maxDepth": 6,
+  "locale": "zh",
+  "sizingStrategy": "equal",
+  "newFileDaysThreshold": 7
+}
