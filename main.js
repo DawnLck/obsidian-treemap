@@ -2964,7 +2964,8 @@ var TRANSLATIONS = {
     legend_fresh: "New Docs",
     legend_growth: "Old Docs",
     new_file_days_label: "New File Threshold (Days)",
-    new_file_days_desc: "Days a file is considered new, blending smoothly into the base color."
+    new_file_days_desc: "Days a file is considered new, blending smoothly into the base color.",
+    toggle_title: "Toggle Document Titles (Privacy)"
   },
   zh: {
     settings_title: "\u6570\u5B57\u82B1\u56ED\u77E9\u9635\u56FE\u8BBE\u7F6E",
@@ -2999,7 +3000,8 @@ var TRANSLATIONS = {
     legend_fresh: "\u65B0\u6587\u6863",
     legend_growth: "\u65E7\u6587\u6863",
     new_file_days_label: "\u65B0\u6587\u4EF6\u5224\u5B9A\u9608\u503C (\u5929)",
-    new_file_days_desc: "\u5B9A\u4E49\u6587\u6863\u5728\u6B64\u5929\u6570\u5185\u5448\u73B0\u7531\u65B0\u5230\u65E7\u7684\u9636\u68AF\u989C\u8272\u892A\u53D8\u3002"
+    new_file_days_desc: "\u5B9A\u4E49\u6587\u6863\u5728\u6B64\u5929\u6570\u5185\u5448\u73B0\u7531\u65B0\u5230\u65E7\u7684\u9636\u68AF\u989C\u8272\u892A\u53D8\u3002",
+    toggle_title: "\u5207\u6362\u6587\u6863\u6807\u9898\u663E\u793A (\u9690\u79C1\u4FDD\u62A4)"
   }
 };
 var DEFAULT_SETTINGS = {
@@ -3012,7 +3014,8 @@ var DEFAULT_SETTINGS = {
   maxDepth: 3,
   locale: "en",
   sizingStrategy: "chars",
-  newFileDaysThreshold: 7
+  newFileDaysThreshold: 7,
+  showTitle: true
 };
 var DigitalGardenTreemapPlugin = class extends import_obsidian.Plugin {
   constructor() {
@@ -3083,7 +3086,7 @@ var TreemapView = class extends import_obsidian.ItemView {
     const container = this.containerEl.children[1];
     container.empty();
     container.classList.add("treemap-view-container");
-    this.renderControls(container);
+    container.createDiv({ cls: "treemap-controls-container" });
     const treemapContainer = container.createDiv({ cls: "treemap-container" });
     treemapContainer.classList.add("treemap-container-inner");
     const resizeObserver = new ResizeObserver(() => {
@@ -3093,6 +3096,7 @@ var TreemapView = class extends import_obsidian.ItemView {
     this.renderTreemap(treemapContainer);
   }
   renderControls(container) {
+    container.empty();
     const controls = container.createDiv({ cls: "treemap-controls" });
     const breadcrumbs = controls.createDiv({ cls: "treemap-breadcrumbs" });
     this.renderBreadcrumbs(breadcrumbs);
@@ -3107,7 +3111,18 @@ var TreemapView = class extends import_obsidian.ItemView {
     createLegendItem("fresh", "legend_fresh");
     createLegendItem("growth", "legend_growth");
     rightControls.createDiv({ cls: "treemap-v-divider" });
-    const sizingWrapper = rightControls.createDiv({ cls: "treemap-segmented-control" });
+    const toolGroup = rightControls.createDiv({ cls: "treemap-tool-group" });
+    const privacyToggle = toolGroup.createDiv({
+      cls: `treemap-icon-btn ${!this.plugin.settings.showTitle ? "is-active" : ""}`,
+      attr: { "aria-label": this.plugin.t("toggle_title") }
+    });
+    (0, import_obsidian.setIcon)(privacyToggle, this.plugin.settings.showTitle ? "eye" : "eye-off");
+    privacyToggle.onclick = async () => {
+      this.plugin.settings.showTitle = !this.plugin.settings.showTitle;
+      await this.plugin.saveSettings();
+      this.refresh();
+    };
+    const sizingWrapper = toolGroup.createDiv({ cls: "treemap-segmented-control" });
     const createSegment = (value, labelKey) => {
       const segment = sizingWrapper.createDiv({
         cls: `treemap-segment ${this.plugin.settings.sizingStrategy === value ? "is-active" : ""}`,
@@ -3152,10 +3167,9 @@ var TreemapView = class extends import_obsidian.ItemView {
       this.tooltipEl = null;
       this.renderTreemap(container);
     }
-    const breadcrumbs = this.containerEl.querySelector(".treemap-breadcrumbs");
-    if (breadcrumbs) {
-      breadcrumbs.empty();
-      this.renderBreadcrumbs(breadcrumbs);
+    const controlsContainer = this.containerEl.querySelector(".treemap-controls-container");
+    if (controlsContainer) {
+      this.renderControls(controlsContainer);
     }
   }
   async renderTreemap(container) {
@@ -3196,7 +3210,9 @@ var TreemapView = class extends import_obsidian.ItemView {
     }).append("foreignObject").attr("width", (d) => Math.max(0, d.x1 - d.x0)).attr("height", (d) => Math.max(0, d.y1 - d.y0)).style("pointer-events", "none").append("xhtml:div").attr("class", (d) => `treemap-node-label-container ${d.data.children ? "is-folder" : "is-leaf"}`).html((d) => {
       const isFolder = !!d.data.children;
       let displayName = d.data.name;
-      if (!isFolder && displayName.length > 10) {
+      if (!isFolder && !this.plugin.settings.showTitle) {
+        displayName = "***";
+      } else if (!isFolder && displayName.length > 10) {
         displayName = displayName.substring(0, 10) + "\u2026";
       }
       const badge = isFolder && (d.depth === 1 || d.depth === 2) ? `<div class="treemap-node-badge">${d.data.childCount}</div>` : "";
@@ -3219,8 +3235,9 @@ var TreemapView = class extends import_obsidian.ItemView {
       this.tooltipEl = document.body.createDiv({ cls: "dg-tooltip" });
     }
     this.tooltipEl.style.display = "block";
+    const displayName = !d.data.children && !this.plugin.settings.showTitle ? "***" : d.data.name;
     this.tooltipEl.innerHTML = `
-			<div class="dg-tooltip-title">${d.data.name}</div>
+			<div class="dg-tooltip-title">${displayName}</div>
 			<div class="dg-tooltip-meta">
 				<span>${((_a = d.data.chars) == null ? void 0 : _a.toLocaleString()) || 0} ${this.plugin.t("chars_unit")}</span>
 				<span style="color: var(--text-muted)">${this.plugin.t("node_level")} ${d.depth}</span>

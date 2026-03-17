@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, ItemView, TFile, TAbstractFile, TFolder } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, ItemView, TFile, TAbstractFile, TFolder, setIcon } from 'obsidian';
 import * as d3 from 'd3';
 
 export const VIEW_TYPE_TREEMAP = "digital-garden-treemap-view";
@@ -19,6 +19,7 @@ interface TreemapSettings {
 	locale: 'en' | 'zh';
 	sizingStrategy: 'chars' | 'equal';
 	newFileDaysThreshold: number;
+	showTitle: boolean;
 }
 
 const TRANSLATIONS = {
@@ -55,7 +56,8 @@ const TRANSLATIONS = {
 		legend_fresh: 'New Docs',
 		legend_growth: 'Old Docs',
 		new_file_days_label: 'New File Threshold (Days)',
-		new_file_days_desc: 'Days a file is considered new, blending smoothly into the base color.'
+		new_file_days_desc: 'Days a file is considered new, blending smoothly into the base color.',
+		toggle_title: 'Toggle Document Titles (Privacy)'
 	},
 	zh: {
 		settings_title: '数字花园矩阵图设置',
@@ -90,7 +92,8 @@ const TRANSLATIONS = {
 		legend_fresh: '新文档',
 		legend_growth: '旧文档',
 		new_file_days_label: '新文件判定阈值 (天)',
-		new_file_days_desc: '定义文档在此天数内呈现由新到旧的阶梯颜色褪变。'
+		new_file_days_desc: '定义文档在此天数内呈现由新到旧的阶梯颜色褪变。',
+		toggle_title: '切换文档标题显示 (隐私保护)'
 	}
 };
 
@@ -104,7 +107,8 @@ const DEFAULT_SETTINGS: TreemapSettings = {
 	maxDepth: 3,
 	locale: 'en',
 	sizingStrategy: 'chars',
-	newFileDaysThreshold: 7
+	newFileDaysThreshold: 7,
+	showTitle: true
 }
 
 interface TreemapNode {
@@ -202,8 +206,8 @@ class TreemapView extends ItemView {
 		container.empty();
 		container.classList.add("treemap-view-container");
 		
-		// 1. Header for Controls
-		this.renderControls(container);
+		// 1. Header for Controls (Correctly nested inside the view container)
+		container.createDiv({ cls: "treemap-controls-container" });
 
 		// 2. Content for Treemap
 		const treemapContainer = container.createDiv({ cls: "treemap-container" });
@@ -219,6 +223,7 @@ class TreemapView extends ItemView {
 	}
 
 	private renderControls(container: HTMLElement) {
+		container.empty();
 		const controls = container.createDiv({ cls: 'treemap-controls' });
 		
 		// 1. Breadcrumbs Section (Left)
@@ -242,8 +247,23 @@ class TreemapView extends ItemView {
 
 		rightControls.createDiv({ cls: 'treemap-v-divider' });
 
+		// Tool Group (Privacy + Sizing)
+		const toolGroup = rightControls.createDiv({ cls: 'treemap-tool-group' });
+
+		// Privacy Toggle
+		const privacyToggle = toolGroup.createDiv({ 
+			cls: `treemap-icon-btn ${!this.plugin.settings.showTitle ? 'is-active' : ''}`, 
+			attr: { 'aria-label': this.plugin.t('toggle_title' as any) } 
+		});
+		setIcon(privacyToggle, this.plugin.settings.showTitle ? 'eye' : 'eye-off');
+		privacyToggle.onclick = async () => {
+			this.plugin.settings.showTitle = !this.plugin.settings.showTitle;
+			await this.plugin.saveSettings();
+			this.refresh();
+		};
+
 		// 3. Optimized Sizing Strategy Selector (Segmented Picker)
-		const sizingWrapper = rightControls.createDiv({ cls: 'treemap-segmented-control' });
+		const sizingWrapper = toolGroup.createDiv({ cls: 'treemap-segmented-control' });
 		
 		const createSegment = (value: 'chars' | 'equal', labelKey: string) => {
 			const segment = sizingWrapper.createDiv({ 
@@ -302,11 +322,10 @@ class TreemapView extends ItemView {
 			this.renderTreemap(container);
 		}
 
-		// Sync Breadcrumbs on every refresh
-		const breadcrumbs = this.containerEl.querySelector(".treemap-breadcrumbs") as HTMLElement;
-		if (breadcrumbs) {
-			breadcrumbs.empty();
-			this.renderBreadcrumbs(breadcrumbs);
+		// Re-render controls to sync state (Icons, etc.)
+		const controlsContainer = this.containerEl.querySelector(".treemap-controls-container") as HTMLElement;
+		if (controlsContainer) {
+			this.renderControls(controlsContainer);
 		}
 	}
 
@@ -393,8 +412,10 @@ class TreemapView extends ItemView {
 				const isFolder = !!d.data.children;
 				let displayName = d.data.name;
 				
-				// 自动溢出截断超过 10 字符的文档标题
-				if (!isFolder && displayName.length > 10) {
+				// 自动溢出截断或隐私保护
+				if (!isFolder && !this.plugin.settings.showTitle) {
+					displayName = '***';
+				} else if (!isFolder && displayName.length > 10) {
 					displayName = displayName.substring(0, 10) + '…';
 				}
 
@@ -426,8 +447,9 @@ class TreemapView extends ItemView {
 		}
 		
 		this.tooltipEl.style.display = 'block';
+		const displayName = (!d.data.children && !this.plugin.settings.showTitle) ? '***' : d.data.name;
 		this.tooltipEl.innerHTML = `
-			<div class="dg-tooltip-title">${d.data.name}</div>
+			<div class="dg-tooltip-title">${displayName}</div>
 			<div class="dg-tooltip-meta">
 				<span>${d.data.chars?.toLocaleString() || 0} ${this.plugin.t('chars_unit')}</span>
 				<span style="color: var(--text-muted)">${this.plugin.t('node_level')} ${d.depth}</span>

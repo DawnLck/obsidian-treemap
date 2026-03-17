@@ -51,6 +51,18 @@
     border-color: rgba(255, 255, 255, 0.2);
 }
 
+.treemap-node-label-container {
+    padding: 6px 8px;
+    height: 100%;
+    width: 100%;
+    color: var(--text-normal);
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    position: relative;
+}
+
 .treemap-node-title {
     font-size: 12px;
     font-weight: 500;
@@ -64,15 +76,17 @@
 }
 
 .treemap-node-badge {
+    position: absolute;
+    top: 6px;
+    right: 8px;
     font-size: 9px;
     font-weight: 700;
     color: var(--text-muted);
-    background: rgba(var(--mono-rgb-100), 0.05);
+    background: rgba(var(--mono-rgb-100), 0.08); /* Slightly more prominent */
     padding: 2px 5px;
     border-radius: 3px;
     letter-spacing: 0.02em;
     flex-shrink: 0;
-    margin-left: 8px;
 }
 
 .excluded-folders-list {
@@ -111,6 +125,11 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+}
+
+.treemap-controls-container {
+    width: 100%;
+    flex-shrink: 0;
 }
 
 .treemap-controls {
@@ -174,78 +193,96 @@
 /* Legend Styles */
 .treemap-legend {
     display: flex;
-    gap: 12px;
-    padding: 0 8px;
-    font-size: 11px;
+    gap: 16px;
+    padding: 0 4px;
+    font-size: 11.5px;
     color: var(--text-muted);
-}
-
-.treemap-node-label-container {
-    padding: 6px 8px;
-    height: 100%;
-    width: 100%;
-    color: var(--text-normal);
-    pointer-events: none;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-}
-
-.treemap-node-label-container.is-leaf {
-    padding: 4px 6px; /* 进一步压缩内边距以显示文本 */
-}
-
-.treemap-node-label-container.is-leaf .treemap-node-title {
-    font-size: 10.5px; /* 更小的字号 */
-    font-weight: 400; /* 去掉粗体 */
-    color: rgba(255, 255, 255, 0.75); /* 更浅一级的颜色 */
-}
-
-.treemap-node-label-container.is-folder {
-    pointer-events: all;
-    cursor: pointer;
-}
-
-.treemap-node-label-container.is-folder .treemap-node-title:hover {
-    text-decoration: underline;
-    color: var(--text-accent);
 }
 
 .treemap-legend-item {
     display: flex;
     align-items: center;
     gap: 6px;
+    transition: opacity 0.2s ease;
+}
+
+.treemap-legend-item:hover {
+    opacity: 0.8;
 }
 
 .legend-dot {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    box-shadow: 0 0 4px rgba(0,0,0,0.2);
+    box-shadow: 0 0 8px rgba(0,0,0,0.3);
 }
 
 .treemap-v-divider {
     width: 1px;
-    height: 16px;
-    background: rgba(255, 255, 255, 0.1);
+    height: 18px;
+    background: var(--divider-color);
+    margin: 0 4px;
+    opacity: 0.5;
+}
+
+/* Tool Group: Privacy + Sizing */
+.treemap-tool-group {
+    display: flex;
+    align-items: center;
+    background: var(--background-secondary);
+    padding: 3px;
+    border-radius: 10px;
+    gap: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.treemap-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    background: transparent;
+}
+
+.treemap-icon-btn:hover {
+    color: var(--text-normal);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.treemap-icon-btn.is-active {
+    color: var(--text-accent);
+    background: rgba(var(--text-accent-rgb), 0.1);
+}
+
+.treemap-icon-btn svg {
+    width: 17px;
+    height: 17px;
+    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.treemap-icon-btn:active svg {
+    transform: scale(0.9);
 }
 
 /* Segmented Control Styles */
 .treemap-segmented-control {
     display: flex;
-    background: rgba(0, 0, 0, 0.2);
-    padding: 2px;
-    border-radius: 8px;
     gap: 2px;
 }
 
 .treemap-segment {
-    padding: 4px 12px;
-    border-radius: 6px;
-    font-size: 11px;
+    padding: 5px 14px;
+    border-radius: 7px;
+    font-size: 11.5px;
     color: var(--text-muted);
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
     user-select: none;
     font-weight: 500;
 }
@@ -256,9 +293,9 @@
 }
 
 .treemap-segment.is-active {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--background-primary);
     color: var(--text-normal);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05);
 }
 
 /* Advanced Tooltip Layer */

@@ -1,9 +1,9 @@
 {
-	"id": "obsidian-digital-garden-treemap",
+	"id": "treemap",
 	"name": "Treemap",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "A premium Treemap view for your Obsidian vault, visualizing knowledge as a digital garden.",
+	"description": "A premium Treemap view for your vault, visualizing knowledge as a digital garden.",
 	"author": "Antigravity",
 	"authorUrl": "https://github.com/google-deepmind",
 	"isDesktopOnly": false

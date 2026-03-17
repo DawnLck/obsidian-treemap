@@ -19,7 +19,8 @@
     }
   ],
   "maxDepth": 6,
-  "locale": "zh",
+  "locale": "en",
   "sizingStrategy": "equal",
-  "newFileDaysThreshold": 7
+  "newFileDaysThreshold": 7,
+  "showTitle": false
 }

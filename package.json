@@ -1,15 +1,16 @@
 {
-  "name": "obsidian-digital-garden-treemap",
+  "name": "treemap",
   "version": "1.0.0",
-  "description": "Premium Treemap for Obsidian",
+  "description": "Premium Treemap for your vault",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit && node esbuild.config.mjs production"
   },
   "keywords": [],
-  "author": "Antigravity",
+  "author": "Chaokai",
   "license": "MIT",
+  "repository": "https://github.com/DawnLck/obsidian-treemap",
   "type": "commonjs",
   "devDependencies": {
     "@types/d3": "^7.4.3",
