@@ -130,7 +130,6 @@ export default class DigitalGardenTreemapPlugin extends Plugin {
 	}
 
 	async onload() {
-		console.log('Loading Digital Garden Treemap Plugin');
 		await this.loadSettings();
 
 		this.registerView(
@@ -138,8 +137,8 @@ export default class DigitalGardenTreemapPlugin extends Plugin {
 			(leaf) => new TreemapView(leaf, this)
 		);
 
-		this.addRibbonIcon('layout-grid', 'Open Digital Garden Treemap', () => {
-			this.activateView();
+		this.addRibbonIcon('layout-grid', 'Open digital garden treemap', () => {
+			void this.activateView();
 		});
 
 		this.addSettingTab(new DigitalGardenSettingTab(this.app, this));
@@ -154,7 +153,7 @@ export default class DigitalGardenTreemapPlugin extends Plugin {
 		// Trigger refresh in all views
 		this.app.workspace.getLeavesOfType(VIEW_TYPE_TREEMAP).forEach(leaf => {
 			if (leaf.view instanceof TreemapView) {
-				leaf.view.refresh();
+				void leaf.view.refresh();
 			}
 		});
 	}
@@ -179,7 +178,6 @@ export default class DigitalGardenTreemapPlugin extends Plugin {
 	}
 
 	onunload() {
-		console.log('Unloading Digital Garden Treemap Plugin');
 	}
 }
 
@@ -201,7 +199,8 @@ class TreemapView extends ItemView {
 
 	private currentRootPath: string = "";
 
-	async onOpen() {
+	async onOpen(): Promise<void> {
+		await Promise.resolve();
 		const container = this.containerEl.children[1] as HTMLElement;
 		container.empty();
 		container.classList.add("treemap-view-container");
@@ -215,11 +214,11 @@ class TreemapView extends ItemView {
 		
 		// Setup Resize Observer
 		const resizeObserver = new ResizeObserver(() => {
-			this.refresh();
+			void this.refresh();
 		});
 		resizeObserver.observe(treemapContainer);
 		
-		this.renderTreemap(treemapContainer);
+		void this.renderTreemap(treemapContainer);
 	}
 
 	private renderControls(container: HTMLElement) {
@@ -239,7 +238,7 @@ class TreemapView extends ItemView {
 			const item = legend.createDiv({ cls: 'treemap-legend-item' });
 			const dot = item.createDiv({ cls: 'legend-dot' });
 			dot.style.backgroundColor = this.getEffectiveColor(colorType);
-			item.createSpan({ text: this.plugin.t(labelKey as any) });
+			item.createSpan({ text: this.plugin.t(labelKey as keyof typeof TRANSLATIONS['en']) });
 		};
 
 		createLegendItem('fresh', 'legend_fresh');
@@ -253,13 +252,13 @@ class TreemapView extends ItemView {
 		// Privacy Toggle
 		const privacyToggle = toolGroup.createDiv({ 
 			cls: `treemap-icon-btn ${!this.plugin.settings.showTitle ? 'is-active' : ''}`, 
-			attr: { 'aria-label': this.plugin.t('toggle_title' as any) } 
+			attr: { 'aria-label': this.plugin.t('toggle_title') } 
 		});
 		setIcon(privacyToggle, this.plugin.settings.showTitle ? 'eye' : 'eye-off');
 		privacyToggle.onclick = async () => {
 			this.plugin.settings.showTitle = !this.plugin.settings.showTitle;
 			await this.plugin.saveSettings();
-			this.refresh();
+			void this.refresh();
 		};
 
 		// 3. Optimized Sizing Strategy Selector (Segmented Picker)
@@ -268,7 +267,7 @@ class TreemapView extends ItemView {
 		const createSegment = (value: 'chars' | 'equal', labelKey: string) => {
 			const segment = sizingWrapper.createDiv({ 
 				cls: `treemap-segment ${this.plugin.settings.sizingStrategy === value ? 'is-active' : ''}`,
-				text: this.plugin.t(labelKey as any)
+				text: this.plugin.t(labelKey as keyof typeof TRANSLATIONS['en'])
 			});
 			
 			segment.onclick = async () => {
@@ -295,7 +294,7 @@ class TreemapView extends ItemView {
 		const rootLink = container.createSpan({ cls: 'breadcrumb-item', text: 'Vault' });
 		rootLink.onclick = () => {
 			this.currentRootPath = "";
-			this.refresh();
+			void this.refresh();
 		};
 
 		let currentPathAcc = "";
@@ -307,19 +306,20 @@ class TreemapView extends ItemView {
 			const link = container.createSpan({ cls: 'breadcrumb-item', text: segment });
 			link.onclick = () => {
 				this.currentRootPath = pathRef;
-				this.refresh();
+				void this.refresh();
 			};
 		});
 	}
 
 	private tooltipEl: HTMLElement | null = null;
 
-	async refresh() {
+	async refresh(): Promise<void> {
+		await Promise.resolve();
 		const container = this.containerEl.querySelector(".treemap-container") as HTMLElement;
 		if (container) {
 			container.empty();
 			this.tooltipEl = null; // Reset tooltip on refresh
-			this.renderTreemap(container);
+			void this.renderTreemap(container);
 		}
 
 		// Re-render controls to sync state (Icons, etc.)
@@ -342,8 +342,7 @@ class TreemapView extends ItemView {
 			.size([width, height])
 			.paddingInner(4)
 			.paddingOuter(4)
-			.paddingTop(24) // Unified padding, constant spacing
-			(root);
+			.paddingTop(24)(root);
 
 		const svg = d3.select(container)
 			.append("svg")
@@ -351,7 +350,7 @@ class TreemapView extends ItemView {
 			.attr("height", height)
 			.style("font-family", "inherit");
 
-		const transition = svg.transition().duration(750) as any;
+		const transition = svg.transition().duration(750) as d3.Transition<any, any, any, any>;
 
 		const nodes = svg.selectAll<SVGGElement, d3.HierarchyRectangularNode<TreemapNode>>("g")
 			.data(root.descendants() as d3.HierarchyRectangularNode<TreemapNode>[])
@@ -391,7 +390,7 @@ class TreemapView extends ItemView {
 				if (d.data.path.endsWith('.md')) {
 					const file = this.app.vault.getAbstractFileByPath(d.data.path);
 					if (file instanceof TFile) {
-						this.app.workspace.getLeaf().openFile(file);
+						void this.app.workspace.getLeaf().openFile(file);
 					}
 				}
 			});
@@ -431,7 +430,7 @@ class TreemapView extends ItemView {
 				if (d.data.children) {
 					event.stopPropagation(); // Prevent click from propagating to the rect below
 					this.currentRootPath = d.data.path;
-					this.refresh();
+					void this.refresh();
 				}
 			});
 
@@ -443,10 +442,10 @@ class TreemapView extends ItemView {
 
 	private showTooltip(event: MouseEvent, d: d3.HierarchyRectangularNode<TreemapNode>) {
 		if (!this.tooltipEl) {
-			this.tooltipEl = document.body.createDiv({ cls: 'dg-tooltip' });
+			this.tooltipEl = document.body.createDiv({ cls: 'dg-tooltip is-hidden' });
 		}
 		
-		this.tooltipEl.style.display = 'block';
+		this.tooltipEl.classList.remove('is-hidden');
 		const displayName = (!d.data.children && !this.plugin.settings.showTitle) ? '***' : d.data.name;
 		this.tooltipEl.innerHTML = `
 			<div class="dg-tooltip-title">${displayName}</div>
@@ -477,7 +476,7 @@ class TreemapView extends ItemView {
 
 	private hideTooltip() {
 		if (this.tooltipEl) {
-			this.tooltipEl.style.display = 'none';
+			this.tooltipEl.classList.add('is-hidden');
 		}
 	}
 
@@ -520,7 +519,7 @@ class TreemapView extends ItemView {
 			return growthColor;
 		}
 
-		const presets = {
+		const presets: Record<string, { base: string, fresh: string, growth: string }> = {
 			garden: { base: 'hsla(210, 10%, 40%, 0.4)', fresh: 'hsla(145, 50%, 60%, 0.7)', growth: 'hsla(155, 40%, 45%, 0.6)' },
 			nebula: { base: 'hsla(260, 20%, 30%, 0.5)', fresh: 'hsla(300, 60%, 60%, 0.8)', growth: 'hsla(280, 50%, 45%, 0.7)' },
 			winter: { base: 'hsla(200, 15%, 85%, 0.3)', fresh: 'hsla(210, 80%, 75%, 0.8)', growth: 'hsla(205, 40%, 60%, 0.6)' }
@@ -714,13 +713,13 @@ class DigitalGardenSettingTab extends PluginSettingTab {
 			.setName(this.plugin.t('palette_label'))
 			.setDesc(this.plugin.t('palette_desc'))
 			.addDropdown(dropdown => dropdown
-				.addOption('garden', 'Digital Garden (Green)')
-				.addOption('nebula', 'Midnight Nebula (Purple)')
-				.addOption('winter', 'Nordic Winter (Blue)')
+				.addOption('garden', 'Digital garden (green)')
+				.addOption('nebula', 'Midnight nebula (purple)')
+				.addOption('winter', 'Nordic winter (blue)')
 				.addOption('custom', this.plugin.settings.locale === 'zh' ? '自定义颜色' : 'Custom Color')
 				.setValue(this.plugin.settings.palette)
-				.onChange(async (value: any) => {
-					this.plugin.settings.palette = value;
+				.onChange(async (value) => {
+					this.plugin.settings.palette = value as TreemapSettings['palette'];
 					await this.plugin.saveSettings();
 					this.display();
 				}));
@@ -770,8 +769,8 @@ class DigitalGardenSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName(this.plugin.t('new_file_days_label' as any))
-			.setDesc(this.plugin.t('new_file_days_desc' as any))
+			.setName(this.plugin.t('new_file_days_label'))
+			.setDesc(this.plugin.t('new_file_days_desc'))
 			.addSlider(slider => slider
 				.setLimits(1, 30, 1)
 				.setValue(this.plugin.settings.newFileDaysThreshold || 7)
@@ -802,8 +801,8 @@ class DigitalGardenSettingTab extends PluginSettingTab {
 					.addOption('keyword', this.plugin.t('mode_keyword'))
 					.addOption('extension', this.plugin.t('mode_extension'))
 					.setValue(rule.mode)
-					.onChange(async (value: any) => {
-						this.plugin.settings.excludedFolders[index].mode = value;
+					.onChange(async (value) => {
+						this.plugin.settings.excludedFolders[index].mode = value as ExclusionRule['mode'];
 						await this.plugin.saveSettings();
 					}))
 				.addText(text => text

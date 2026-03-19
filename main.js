@@ -3027,14 +3027,13 @@ var DigitalGardenTreemapPlugin = class extends import_obsidian.Plugin {
     return TRANSLATIONS[locale][key] || TRANSLATIONS["en"][key];
   }
   async onload() {
-    console.log("Loading Digital Garden Treemap Plugin");
     await this.loadSettings();
     this.registerView(
       VIEW_TYPE_TREEMAP,
       (leaf) => new TreemapView(leaf, this)
     );
-    this.addRibbonIcon("layout-grid", "Open Digital Garden Treemap", () => {
-      this.activateView();
+    this.addRibbonIcon("layout-grid", "Open digital garden treemap", () => {
+      void this.activateView();
     });
     this.addSettingTab(new DigitalGardenSettingTab(this.app, this));
   }
@@ -3045,7 +3044,7 @@ var DigitalGardenTreemapPlugin = class extends import_obsidian.Plugin {
     await this.saveData(this.settings);
     this.app.workspace.getLeavesOfType(VIEW_TYPE_TREEMAP).forEach((leaf) => {
       if (leaf.view instanceof TreemapView) {
-        leaf.view.refresh();
+        void leaf.view.refresh();
       }
     });
   }
@@ -3065,7 +3064,6 @@ var DigitalGardenTreemapPlugin = class extends import_obsidian.Plugin {
     workspace.revealLeaf(leaf);
   }
   onunload() {
-    console.log("Unloading Digital Garden Treemap Plugin");
   }
 };
 var TreemapView = class extends import_obsidian.ItemView {
@@ -3083,6 +3081,7 @@ var TreemapView = class extends import_obsidian.ItemView {
     return "Treemap";
   }
   async onOpen() {
+    await Promise.resolve();
     const container = this.containerEl.children[1];
     container.empty();
     container.classList.add("treemap-view-container");
@@ -3090,10 +3089,10 @@ var TreemapView = class extends import_obsidian.ItemView {
     const treemapContainer = container.createDiv({ cls: "treemap-container" });
     treemapContainer.classList.add("treemap-container-inner");
     const resizeObserver = new ResizeObserver(() => {
-      this.refresh();
+      void this.refresh();
     });
     resizeObserver.observe(treemapContainer);
-    this.renderTreemap(treemapContainer);
+    void this.renderTreemap(treemapContainer);
   }
   renderControls(container) {
     container.empty();
@@ -3120,7 +3119,7 @@ var TreemapView = class extends import_obsidian.ItemView {
     privacyToggle.onclick = async () => {
       this.plugin.settings.showTitle = !this.plugin.settings.showTitle;
       await this.plugin.saveSettings();
-      this.refresh();
+      void this.refresh();
     };
     const sizingWrapper = toolGroup.createDiv({ cls: "treemap-segmented-control" });
     const createSegment = (value, labelKey) => {
@@ -3146,7 +3145,7 @@ var TreemapView = class extends import_obsidian.ItemView {
     const rootLink = container.createSpan({ cls: "breadcrumb-item", text: "Vault" });
     rootLink.onclick = () => {
       this.currentRootPath = "";
-      this.refresh();
+      void this.refresh();
     };
     let currentPathAcc = "";
     segments.forEach((segment) => {
@@ -3156,16 +3155,17 @@ var TreemapView = class extends import_obsidian.ItemView {
       const link = container.createSpan({ cls: "breadcrumb-item", text: segment });
       link.onclick = () => {
         this.currentRootPath = pathRef;
-        this.refresh();
+        void this.refresh();
       };
     });
   }
   async refresh() {
+    await Promise.resolve();
     const container = this.containerEl.querySelector(".treemap-container");
     if (container) {
       container.empty();
       this.tooltipEl = null;
-      this.renderTreemap(container);
+      void this.renderTreemap(container);
     }
     const controlsContainer = this.containerEl.querySelector(".treemap-controls-container");
     if (controlsContainer) {
@@ -3199,7 +3199,7 @@ var TreemapView = class extends import_obsidian.ItemView {
       if (d.data.path.endsWith(".md")) {
         const file = this.app.vault.getAbstractFileByPath(d.data.path);
         if (file instanceof import_obsidian.TFile) {
-          this.app.workspace.getLeaf().openFile(file);
+          void this.app.workspace.getLeaf().openFile(file);
         }
       }
     });
@@ -3224,7 +3224,7 @@ var TreemapView = class extends import_obsidian.ItemView {
       if (d.data.children) {
         event.stopPropagation();
         this.currentRootPath = d.data.path;
-        this.refresh();
+        void this.refresh();
       }
     });
     nodes.filter((d) => d.data.path.endsWith("/_more")).style("pointer-events", "none").style("opacity", "0.8");
@@ -3232,9 +3232,9 @@ var TreemapView = class extends import_obsidian.ItemView {
   showTooltip(event, d) {
     var _a;
     if (!this.tooltipEl) {
-      this.tooltipEl = document.body.createDiv({ cls: "dg-tooltip" });
+      this.tooltipEl = document.body.createDiv({ cls: "dg-tooltip is-hidden" });
     }
-    this.tooltipEl.style.display = "block";
+    this.tooltipEl.classList.remove("is-hidden");
     const displayName = !d.data.children && !this.plugin.settings.showTitle ? "***" : d.data.name;
     this.tooltipEl.innerHTML = `
 			<div class="dg-tooltip-title">${displayName}</div>
@@ -3261,7 +3261,7 @@ var TreemapView = class extends import_obsidian.ItemView {
   }
   hideTooltip() {
     if (this.tooltipEl) {
-      this.tooltipEl.style.display = "none";
+      this.tooltipEl.classList.add("is-hidden");
     }
   }
   getNodeColor(d) {
@@ -3445,7 +3445,7 @@ var DigitalGardenSettingTab = class extends import_obsidian.PluginSettingTab {
       this.plugin.settings.showHeatmap = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName(this.plugin.t("palette_label")).setDesc(this.plugin.t("palette_desc")).addDropdown((dropdown) => dropdown.addOption("garden", "Digital Garden (Green)").addOption("nebula", "Midnight Nebula (Purple)").addOption("winter", "Nordic Winter (Blue)").addOption("custom", this.plugin.settings.locale === "zh" ? "\u81EA\u5B9A\u4E49\u989C\u8272" : "Custom Color").setValue(this.plugin.settings.palette).onChange(async (value) => {
+    new import_obsidian.Setting(containerEl).setName(this.plugin.t("palette_label")).setDesc(this.plugin.t("palette_desc")).addDropdown((dropdown) => dropdown.addOption("garden", "Digital garden (green)").addOption("nebula", "Midnight nebula (purple)").addOption("winter", "Nordic winter (blue)").addOption("custom", this.plugin.settings.locale === "zh" ? "\u81EA\u5B9A\u4E49\u989C\u8272" : "Custom Color").setValue(this.plugin.settings.palette).onChange(async (value) => {
       this.plugin.settings.palette = value;
       await this.plugin.saveSettings();
       this.display();
