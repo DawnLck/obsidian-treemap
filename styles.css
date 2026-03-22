@@ -302,6 +302,10 @@
     display: none !important;
 }
 
+.is-muted {
+    color: var(--text-muted) !important;
+}
+
 /* Advanced Tooltip Layer */
 .dg-tooltip {
     position: fixed; /* Fixed to follow mouse globally */
@@ -319,6 +323,16 @@
     max-width: 340px;
     line-height: 1.4;
     transition: opacity 0.2s ease;
+    
+    /* Position control via CSS properties */
+    left: var(--tooltip-x, 0);
+    top: var(--tooltip-y, 0);
+    right: auto;
+}
+
+.dg-tooltip.is-right-aligned {
+    left: auto;
+    right: var(--tooltip-right-x, 0);
 }
 
 .dg-tooltip-title {

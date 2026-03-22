@@ -20,7 +20,7 @@
   ],
   "maxDepth": 6,
   "locale": "zh",
-  "sizingStrategy": "equal",
+  "sizingStrategy": "chars",
   "newFileDaysThreshold": 7,
   "showTitle": true
 }
