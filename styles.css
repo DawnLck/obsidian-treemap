@@ -306,9 +306,42 @@
     color: var(--text-muted) !important;
 }
 
+/* Phase 3: Privacy Blur Mode */
+.is-privacy-blur .treemap-node-title {
+    filter: blur(4px);
+    user-select: none;
+    transition: filter 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Phase 3: Gradient Fade Truncation (replaces hard "..." cutoff) */
+.treemap-node-title.has-fade-truncation {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    -webkit-mask-image: linear-gradient(to right, black 65%, transparent 100%);
+    mask-image: linear-gradient(to right, black 65%, transparent 100%);
+}
+
+/* Phase 3: "More" Node Indicator */
+.is-more-indicator {
+    justify-content: center;
+    align-items: center;
+}
+
+.is-more-indicator .treemap-node-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    text-align: center;
+    -webkit-mask-image: none;
+    mask-image: none;
+}
+
 /* Advanced Tooltip Layer */
 .dg-tooltip {
-    position: fixed; /* Fixed to follow mouse globally */
+    position: fixed;
     padding: 10px 14px;
     background: rgba(15, 15, 15, 0.98);
     backdrop-filter: blur(20px);
@@ -322,7 +355,7 @@
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
     max-width: 340px;
     line-height: 1.4;
-    transition: opacity 0.2s ease;
+    /* No CSS transition on position — rAF spring physics handles smoothness */
     
     /* Position control via CSS properties */
     left: var(--tooltip-x, 0);
@@ -337,7 +370,7 @@
 
 .dg-tooltip-title {
     font-weight: 600;
-    color: #4ade80; /* Brighter Emerlad for visibility */
+    color: #4ade80;
     margin-bottom: 6px;
     display: block;
     font-size: 14px;
@@ -347,7 +380,7 @@
 .dg-tooltip-meta {
     font-family: -apple-system, sans-serif;
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.85); /* Boosted contrast */
+    color: rgba(255, 255, 255, 0.85);
     display: flex;
     gap: 12px;
 }

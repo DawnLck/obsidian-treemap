@@ -1,6 +1,6 @@
 {
   "name": "treemap",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Premium Treemap for your vault",
   "main": "main.js",
   "scripts": {

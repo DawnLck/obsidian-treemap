@@ -1,5 +1,14 @@
-import { App, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, ItemView, TFile, TFolder, setIcon } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, ItemView, TFile, TFolder, setIcon, EventRef } from 'obsidian';
 import * as d3 from 'd3';
+
+// --- Utility: Debounce with trailing edge ---
+function debounce(fn: () => void, delay: number): () => void {
+	let timer: ReturnType<typeof setTimeout>;
+	return () => {
+		clearTimeout(timer);
+		timer = setTimeout(fn, delay);
+	};
+}
 
 export const VIEW_TYPE_TREEMAP = "digital-garden-treemap-view";
 
@@ -150,9 +159,10 @@ export default class DigitalGardenTreemapPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-		// Trigger refresh in all views
+		// Trigger refresh in all views with cache invalidation
 		this.app.workspace.getLeavesOfType(VIEW_TYPE_TREEMAP).forEach(leaf => {
 			if (leaf.view instanceof TreemapView) {
+				leaf.view.invalidateCache();
 				void leaf.view.refresh();
 			}
 		});
@@ -199,6 +209,32 @@ class TreemapView extends ItemView {
 
 	private currentRootPath: string = "";
 
+	// --- Performance: Data Cache ---
+	private hierarchyCache: TreemapNode | null = null;
+	private cacheValid = false;
+
+	// --- Performance: Resize Debounce ---
+	private resizeObserver: ResizeObserver | null = null;
+
+	// --- Physics: Elastic Tooltip ---
+	private tooltipEl: HTMLElement | null = null;
+	private tooltipTargetX = 0;
+	private tooltipTargetY = 0;
+	private tooltipCurrentX = 0;
+	private tooltipCurrentY = 0;
+	private tooltipRafId = 0;
+	private tooltipVisible = false;
+	private tooltipIsRightAligned = false;
+
+	// --- Vault Event References ---
+	private vaultEventRefs: EventRef[] = [];
+
+	/** Mark data cache as stale */
+	invalidateCache() {
+		this.cacheValid = false;
+		this.hierarchyCache = null;
+	}
+
 	async onOpen(): Promise<void> {
 		await Promise.resolve();
 		const container = this.containerEl.children[1] as HTMLElement;
@@ -212,11 +248,32 @@ class TreemapView extends ItemView {
 		const treemapContainer = container.createDiv({ cls: "treemap-container" });
 		treemapContainer.classList.add("treemap-container-inner");
 
-		// Setup Resize Observer
-		const resizeObserver = new ResizeObserver(() => {
+		// Debounced Resize Observer (prevent layout thrashing)
+		const debouncedRefresh = debounce(() => {
 			void this.refresh();
+		}, 150);
+
+		this.resizeObserver = new ResizeObserver(() => {
+			debouncedRefresh();
 		});
-		resizeObserver.observe(treemapContainer);
+		this.resizeObserver.observe(treemapContainer);
+
+		// Vault Event Listeners (incremental cache invalidation)
+		const vault = this.app.vault;
+		const onVaultStructureChange = debounce(() => {
+			this.invalidateCache();
+			void this.refresh();
+		}, 300);
+
+		this.vaultEventRefs = [
+			vault.on('create', onVaultStructureChange),
+			vault.on('delete', onVaultStructureChange),
+			vault.on('rename', onVaultStructureChange),
+			vault.on('modify', debounce(() => {
+				// High-frequency: only invalidate, don't force re-render
+				this.invalidateCache();
+			}, 1000))
+		];
 
 		void this.renderTreemap(treemapContainer);
 	}
@@ -294,6 +351,7 @@ class TreemapView extends ItemView {
 		const rootLink = container.createSpan({ cls: 'breadcrumb-item', text: 'Vault' });
 		rootLink.onclick = () => {
 			this.currentRootPath = "";
+			this.invalidateCache();
 			void this.refresh();
 		};
 
@@ -306,23 +364,27 @@ class TreemapView extends ItemView {
 			const link = container.createSpan({ cls: 'breadcrumb-item', text: segment });
 			link.onclick = () => {
 				this.currentRootPath = pathRef;
+				this.invalidateCache();
 				void this.refresh();
 			};
 		});
 	}
-
-	private tooltipEl: HTMLElement | null = null;
 
 	async refresh(): Promise<void> {
 		await Promise.resolve();
 		const container = this.containerEl.querySelector(".treemap-container") as HTMLElement;
 		if (container) {
 			container.empty();
-			this.tooltipEl = null; // Reset tooltip on refresh
+			this.tooltipEl = null;
+			this.tooltipVisible = false;
+			if (this.tooltipRafId) {
+				cancelAnimationFrame(this.tooltipRafId);
+				this.tooltipRafId = 0;
+			}
 			void this.renderTreemap(container);
 		}
 
-		// Re-render controls to sync state (Icons, etc.)
+		// Re-render controls to sync state
 		const controlsContainer = this.containerEl.querySelector(".treemap-controls-container") as HTMLElement;
 		if (controlsContainer) {
 			this.renderControls(controlsContainer);
@@ -350,7 +412,8 @@ class TreemapView extends ItemView {
 			.attr("height", height)
 			.style("font-family", "inherit");
 
-		const transition = d3.transition().duration(400);
+		// Physics-based easing: cubic-out for natural deceleration
+		const transition = d3.transition().duration(500).ease(d3.easeCubicOut);
 
 		const nodes = svg.selectAll<SVGGElement, d3.HierarchyRectangularNode<TreemapNode>>("g")
 			.data(root.descendants() as d3.HierarchyRectangularNode<TreemapNode>[])
@@ -381,13 +444,20 @@ class TreemapView extends ItemView {
 				}
 			})
 			.on("mousemove", (event) => {
-				this.moveTooltip(event);
+				this.updateTooltipTarget(event);
 			})
 			.on("mouseleave", () => {
 				this.hideTooltip();
 			})
 			.on("click", (event, d) => {
-				if (d.data.path.endsWith('.md')) {
+				if (d.data.children) {
+					// Phase 3 Fix: Handle folder drill-down on the main rect
+					event.stopPropagation();
+					this.currentRootPath = d.data.path;
+					this.invalidateCache();
+					void this.refresh();
+				} else if (d.data.path.endsWith('.md')) {
+					// Handle file opening
 					const file = this.app.vault.getAbstractFileByPath(d.data.path);
 					if (file instanceof TFile) {
 						void this.app.workspace.getLeaf().openFile(file);
@@ -408,35 +478,37 @@ class TreemapView extends ItemView {
 			.append("xhtml:div") // Append an HTML div inside the foreignObject
 			.attr("class", d => `treemap-node-label-container ${d.data.children ? 'is-folder' : 'is-leaf'}`)
 			.each((d, i, selection) => {
-				const container = selection[i] as HTMLElement;
+				const labelContainer = selection[i] as HTMLElement;
 				const isFolder = !!d.data.children;
-				let displayName = d.data.name;
+				const isMoreNode = d.data.path.endsWith('/_more');
 
-				// 自动溢出截断或隐私保护
-				if (!isFolder && !this.plugin.settings.showTitle) {
-					displayName = '***';
-				} else if (!isFolder && displayName.length > 10) {
-					displayName = displayName.substring(0, 10) + '…';
+				// Phase 3: Privacy blur — CSS class instead of text replacement
+				const isPrivacyActive = !isFolder && !this.plugin.settings.showTitle && !isMoreNode;
+				if (isPrivacyActive) {
+					labelContainer.classList.add('is-privacy-blur');
 				}
 
-				container.createDiv({
+				const titleEl = labelContainer.createDiv({
 					cls: "treemap-node-title",
-					text: displayName,
-					attr: { title: d.data.name }
+					text: d.data.name,
+					attr: { title: isPrivacyActive ? '' : d.data.name }
 				});
 
+				// Phase 3: Gradient fade truncation for leaf nodes
+				if (!isFolder) {
+					titleEl.classList.add('has-fade-truncation');
+				}
+
 				if (isFolder && (d.depth === 1 || d.depth === 2)) {
-					container.createDiv({
+					labelContainer.createDiv({
 						cls: "treemap-node-badge",
 						text: String(d.data.childCount)
 					});
 				}
-			})
-			.on("click", (event, d) => {
-				if (d.data.children) {
-					event.stopPropagation(); // Prevent click from propagating to the rect below
-					this.currentRootPath = d.data.path;
-					void this.refresh();
+
+				// Phase 3: "More" node visual upgrade
+				if (isMoreNode) {
+					labelContainer.classList.add('is-more-indicator');
 				}
 			});
 
@@ -445,6 +517,8 @@ class TreemapView extends ItemView {
 			.style("pointer-events", "none")
 			.style("opacity", "0.8");
 	}
+
+	// --- Tooltip System: Elastic Spring Physics ---
 
 	private showTooltip(event: MouseEvent, d: d3.HierarchyRectangularNode<TreemapNode>) {
 		if (!this.tooltipEl) {
@@ -463,31 +537,86 @@ class TreemapView extends ItemView {
 			text: `${this.plugin.t('node_level')} ${d.depth}`,
 			cls: 'is-muted'
 		});
-		this.moveTooltip(event);
+
+		// Initialize position instantly on first show (no lag from zero)
+		const offset = 12;
+		const winWidth = window.innerWidth;
+		this.tooltipIsRightAligned = event.clientX > winWidth / 2;
+
+		if (this.tooltipIsRightAligned) {
+			this.tooltipTargetX = winWidth - event.clientX + offset;
+		} else {
+			this.tooltipTargetX = event.clientX + offset;
+		}
+		this.tooltipTargetY = event.clientY + offset;
+		this.tooltipCurrentX = this.tooltipTargetX;
+		this.tooltipCurrentY = this.tooltipTargetY;
+		this.tooltipVisible = true;
+
+		this.applyTooltipPosition();
+		this.startTooltipAnimation();
 	}
 
-	private moveTooltip(event: MouseEvent) {
-		if (!this.tooltipEl) return;
-		const offset = 12; // Precise offset
+	private updateTooltipTarget(event: MouseEvent) {
+		if (!this.tooltipVisible) return;
+		const offset = 12;
 		const winWidth = window.innerWidth;
 
-		// Move to setCssProps for better theming/performance
-		if (event.clientX > winWidth / 2) {
+		this.tooltipIsRightAligned = event.clientX > winWidth / 2;
+
+		if (this.tooltipIsRightAligned) {
+			this.tooltipTargetX = winWidth - event.clientX + offset;
+		} else {
+			this.tooltipTargetX = event.clientX + offset;
+		}
+		this.tooltipTargetY = event.clientY + offset;
+	}
+
+	private startTooltipAnimation() {
+		if (this.tooltipRafId) return;
+
+		const animate = () => {
+			if (!this.tooltipVisible) {
+				this.tooltipRafId = 0;
+				return;
+			}
+
+			// Spring-like interpolation (0.12 = soft, buttery trailing)
+			const lerpFactor = 0.12;
+			this.tooltipCurrentX += (this.tooltipTargetX - this.tooltipCurrentX) * lerpFactor;
+			this.tooltipCurrentY += (this.tooltipTargetY - this.tooltipCurrentY) * lerpFactor;
+
+			this.applyTooltipPosition();
+			this.tooltipRafId = requestAnimationFrame(animate);
+		};
+
+		this.tooltipRafId = requestAnimationFrame(animate);
+	}
+
+	private applyTooltipPosition() {
+		if (!this.tooltipEl) return;
+
+		if (this.tooltipIsRightAligned) {
 			this.tooltipEl.addClass('is-right-aligned');
 			this.tooltipEl.setCssProps({
-				'--tooltip-y': `${event.clientY + offset}px`,
-				'--tooltip-right-x': `${winWidth - event.clientX + offset}px`
+				'--tooltip-y': `${this.tooltipCurrentY}px`,
+				'--tooltip-right-x': `${this.tooltipCurrentX}px`
 			});
 		} else {
 			this.tooltipEl.removeClass('is-right-aligned');
 			this.tooltipEl.setCssProps({
-				'--tooltip-y': `${event.clientY + offset}px`,
-				'--tooltip-x': `${event.clientX + offset}px`
+				'--tooltip-y': `${this.tooltipCurrentY}px`,
+				'--tooltip-x': `${this.tooltipCurrentX}px`
 			});
 		}
 	}
 
 	private hideTooltip() {
+		this.tooltipVisible = false;
+		if (this.tooltipRafId) {
+			cancelAnimationFrame(this.tooltipRafId);
+			this.tooltipRafId = 0;
+		}
 		if (this.tooltipEl) {
 			this.tooltipEl.classList.add('is-hidden');
 		}
@@ -516,10 +645,11 @@ class TreemapView extends ItemView {
 		// 保证 t 在 0 到 1 之间
 		const clampedT = Math.max(0, Math.min(1, t));
 
+		// HCL interpolation: perceptually uniform brightness across the gradient
 		if (clampedT < 0.5) {
-			return d3.interpolateHsl(fresh, growth)(clampedT * 2);
+			return d3.interpolateHcl(fresh, growth)(clampedT * 2);
 		} else {
-			return d3.interpolateHsl(growth, base)((clampedT - 0.5) * 2);
+			return d3.interpolateHcl(growth, base)((clampedT - 0.5) * 2);
 		}
 	}
 
@@ -554,6 +684,11 @@ class TreemapView extends ItemView {
 	}
 
 	async buildHierarchy(): Promise<TreemapNode> {
+		// Return cached data if still valid
+		if (this.cacheValid && this.hierarchyCache) {
+			return this.hierarchyCache;
+		}
+
 		let targetFolder: TFolder | null = null;
 		if (this.currentRootPath) {
 			const abstractFile = this.app.vault.getAbstractFileByPath(this.currentRootPath);
@@ -567,7 +702,13 @@ class TreemapView extends ItemView {
 			this.currentRootPath = "";
 		}
 
-		return this.processFolder(targetFolder, 0);
+		const result = await this.processFolder(targetFolder, 0);
+
+		// Store in cache
+		this.hierarchyCache = result;
+		this.cacheValid = true;
+
+		return result;
 	}
 
 	private async processFolder(folder: TFolder, depth: number): Promise<TreemapNode> {
@@ -680,9 +821,28 @@ class TreemapView extends ItemView {
 	}
 
 	async onClose() {
+		// Cleanup tooltip
 		if (this.tooltipEl) {
-			await this.tooltipEl.remove();
+			this.tooltipEl.remove();
+			this.tooltipEl = null;
 		}
+		if (this.tooltipRafId) {
+			cancelAnimationFrame(this.tooltipRafId);
+			this.tooltipRafId = 0;
+		}
+
+		// Disconnect resize observer
+		if (this.resizeObserver) {
+			this.resizeObserver.disconnect();
+			this.resizeObserver = null;
+		}
+
+		// Unregister vault events
+		this.vaultEventRefs.forEach(ref => this.app.vault.offref(ref));
+		this.vaultEventRefs = [];
+
+		// Clear cache
+		this.invalidateCache();
 	}
 }
 

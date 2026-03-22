@@ -6,6 +6,8 @@
 
 ## 简体中文
 
+![Treemap Cover](intro/image_cover.png)
+
 Treemap 是一款极致极简、美感十足的矩阵图插件。它将您的笔记库视作一座数字花园，通过动态的色块分布，让您一眼洞察知识的深度与生命力。
 
 ### 核心特性
@@ -17,6 +19,8 @@ Treemap 是一款极致极简、美感十足的矩阵图插件。它将您的笔
 - **全景观排除系统**：支持路径、关键词、后缀三重匹配规则。
 - **极致设计**：支持 Glassmorphism 磨砂玻璃特效，完美契合现代审美。
 
+![Treemap Settings](intro/image_setting.png)
+
 ### 安装方法
 1. 前往 GitHub Releases 下载最新的 `main.js`, `manifest.json`, `styles.css`。
 2. 在您的插件目录中，创建目录 `treemap`。
@@ -26,6 +30,8 @@ Treemap 是一款极致极简、美感十足的矩阵图插件。它将您的笔
 ---
 
 ## English
+
+![Treemap Cover](intro/image_cover.png)
 
 Treemap is a premium, aesthetic visualization plugin for your vault. It treats it as a digital garden, allowing you to perceive the depth and vitality of your knowledge thru dynamic color blocks.
 
@@ -37,6 +43,8 @@ Treemap is a premium, aesthetic visualization plugin for your vault. It treats i
 - **Dynamic Legend**: Real-time status visualization for new and old documents.
 - **Robust Exclusion**: Advanced filtering by Path, Keyword, or Extension.
 - **Premium UI**: Glassmorphism and sub-pixel perfection.
+
+![Treemap Settings](intro/image_setting.png)
 
 ---
 

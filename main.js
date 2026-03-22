@@ -1319,10 +1319,117 @@ function hsl2rgb(h, m1, m2) {
   return (h < 60 ? m1 + (m2 - m1) * h / 60 : h < 180 ? m2 : h < 240 ? m1 + (m2 - m1) * (240 - h) / 60 : m1) * 255;
 }
 
+// node_modules/d3-color/src/math.js
+var radians = Math.PI / 180;
+var degrees = 180 / Math.PI;
+
+// node_modules/d3-color/src/lab.js
+var K = 18;
+var Xn = 0.96422;
+var Yn = 1;
+var Zn = 0.82521;
+var t0 = 4 / 29;
+var t1 = 6 / 29;
+var t2 = 3 * t1 * t1;
+var t3 = t1 * t1 * t1;
+function labConvert(o) {
+  if (o instanceof Lab)
+    return new Lab(o.l, o.a, o.b, o.opacity);
+  if (o instanceof Hcl)
+    return hcl2lab(o);
+  if (!(o instanceof Rgb))
+    o = rgbConvert(o);
+  var r = rgb2lrgb(o.r), g = rgb2lrgb(o.g), b = rgb2lrgb(o.b), y = xyz2lab((0.2225045 * r + 0.7168786 * g + 0.0606169 * b) / Yn), x, z;
+  if (r === g && g === b)
+    x = z = y;
+  else {
+    x = xyz2lab((0.4360747 * r + 0.3850649 * g + 0.1430804 * b) / Xn);
+    z = xyz2lab((0.0139322 * r + 0.0971045 * g + 0.7141733 * b) / Zn);
+  }
+  return new Lab(116 * y - 16, 500 * (x - y), 200 * (y - z), o.opacity);
+}
+function lab(l, a, b, opacity) {
+  return arguments.length === 1 ? labConvert(l) : new Lab(l, a, b, opacity == null ? 1 : opacity);
+}
+function Lab(l, a, b, opacity) {
+  this.l = +l;
+  this.a = +a;
+  this.b = +b;
+  this.opacity = +opacity;
+}
+define_default(Lab, lab, extend(Color, {
+  brighter(k) {
+    return new Lab(this.l + K * (k == null ? 1 : k), this.a, this.b, this.opacity);
+  },
+  darker(k) {
+    return new Lab(this.l - K * (k == null ? 1 : k), this.a, this.b, this.opacity);
+  },
+  rgb() {
+    var y = (this.l + 16) / 116, x = isNaN(this.a) ? y : y + this.a / 500, z = isNaN(this.b) ? y : y - this.b / 200;
+    x = Xn * lab2xyz(x);
+    y = Yn * lab2xyz(y);
+    z = Zn * lab2xyz(z);
+    return new Rgb(
+      lrgb2rgb(3.1338561 * x - 1.6168667 * y - 0.4906146 * z),
+      lrgb2rgb(-0.9787684 * x + 1.9161415 * y + 0.033454 * z),
+      lrgb2rgb(0.0719453 * x - 0.2289914 * y + 1.4052427 * z),
+      this.opacity
+    );
+  }
+}));
+function xyz2lab(t) {
+  return t > t3 ? Math.pow(t, 1 / 3) : t / t2 + t0;
+}
+function lab2xyz(t) {
+  return t > t1 ? t * t * t : t2 * (t - t0);
+}
+function lrgb2rgb(x) {
+  return 255 * (x <= 31308e-7 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055);
+}
+function rgb2lrgb(x) {
+  return (x /= 255) <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+}
+function hclConvert(o) {
+  if (o instanceof Hcl)
+    return new Hcl(o.h, o.c, o.l, o.opacity);
+  if (!(o instanceof Lab))
+    o = labConvert(o);
+  if (o.a === 0 && o.b === 0)
+    return new Hcl(NaN, 0 < o.l && o.l < 100 ? 0 : NaN, o.l, o.opacity);
+  var h = Math.atan2(o.b, o.a) * degrees;
+  return new Hcl(h < 0 ? h + 360 : h, Math.sqrt(o.a * o.a + o.b * o.b), o.l, o.opacity);
+}
+function hcl(h, c, l, opacity) {
+  return arguments.length === 1 ? hclConvert(h) : new Hcl(h, c, l, opacity == null ? 1 : opacity);
+}
+function Hcl(h, c, l, opacity) {
+  this.h = +h;
+  this.c = +c;
+  this.l = +l;
+  this.opacity = +opacity;
+}
+function hcl2lab(o) {
+  if (isNaN(o.h))
+    return new Lab(o.l, 0, 0, o.opacity);
+  var h = o.h * radians;
+  return new Lab(o.l, Math.cos(h) * o.c, Math.sin(h) * o.c, o.opacity);
+}
+define_default(Hcl, hcl, extend(Color, {
+  brighter(k) {
+    return new Hcl(this.h, this.c, this.l + K * (k == null ? 1 : k), this.opacity);
+  },
+  darker(k) {
+    return new Hcl(this.h, this.c, this.l - K * (k == null ? 1 : k), this.opacity);
+  },
+  rgb() {
+    return hcl2lab(this).rgb();
+  }
+}));
+
 // node_modules/d3-interpolate/src/basis.js
-function basis(t1, v0, v1, v2, v3) {
-  var t2 = t1 * t1, t3 = t2 * t1;
-  return ((1 - 3 * t1 + 3 * t2 - t3) * v0 + (4 - 6 * t2 + 3 * t3) * v1 + (1 + 3 * t1 + 3 * t2 - 3 * t3) * v2 + t3 * v3) / 6;
+function basis(t12, v0, v1, v2, v3) {
+  var t22 = t12 * t12, t32 = t22 * t12;
+  return ((1 - 3 * t12 + 3 * t22 - t32) * v0 + (4 - 6 * t22 + 3 * t32) * v1 + (1 + 3 * t12 + 3 * t22 - 3 * t32) * v2 + t32 * v3) / 6;
 }
 function basis_default(values) {
   var n = values.length - 1;
@@ -1466,7 +1573,7 @@ function string_default(a, b) {
 }
 
 // node_modules/d3-interpolate/src/transform/decompose.js
-var degrees = 180 / Math.PI;
+var degrees2 = 180 / Math.PI;
 var identity = {
   translateX: 0,
   translateY: 0,
@@ -1488,8 +1595,8 @@ function decompose_default(a, b, c, d, e, f) {
   return {
     translateX: e,
     translateY: f,
-    rotate: Math.atan2(b, a) * degrees,
-    skewX: Math.atan(skewX) * degrees,
+    rotate: Math.atan2(b, a) * degrees2,
+    skewX: Math.atan(skewX) * degrees2,
     scaleX,
     scaleY
   };
@@ -1571,21 +1678,21 @@ function interpolateTransform(parse, pxComma, pxParen, degParen) {
 var interpolateTransformCss = interpolateTransform(parseCss, "px, ", "px)", "deg)");
 var interpolateTransformSvg = interpolateTransform(parseSvg, ", ", ")", ")");
 
-// node_modules/d3-interpolate/src/hsl.js
-function hsl2(hue2) {
+// node_modules/d3-interpolate/src/hcl.js
+function hcl2(hue2) {
   return function(start2, end) {
-    var h = hue2((start2 = hsl(start2)).h, (end = hsl(end)).h), s = nogamma(start2.s, end.s), l = nogamma(start2.l, end.l), opacity = nogamma(start2.opacity, end.opacity);
+    var h = hue2((start2 = hcl(start2)).h, (end = hcl(end)).h), c = nogamma(start2.c, end.c), l = nogamma(start2.l, end.l), opacity = nogamma(start2.opacity, end.opacity);
     return function(t) {
       start2.h = h(t);
-      start2.s = s(t);
+      start2.c = c(t);
       start2.l = l(t);
       start2.opacity = opacity(t);
       return start2 + "";
     };
   };
 }
-var hsl_default = hsl2(hue);
-var hslLong = hsl2(nogamma);
+var hcl_default = hcl2(hue);
+var hclLong = hcl2(nogamma);
 
 // node_modules/d3-timer/src/timer.js
 var frame = 0;
@@ -1668,18 +1775,18 @@ function poke() {
     clockSkew -= delay, clockLast = now2;
 }
 function nap() {
-  var t0, t1 = taskHead, t2, time = Infinity;
-  while (t1) {
-    if (t1._call) {
-      if (time > t1._time)
-        time = t1._time;
-      t0 = t1, t1 = t1._next;
+  var t02, t12 = taskHead, t22, time = Infinity;
+  while (t12) {
+    if (t12._call) {
+      if (time > t12._time)
+        time = t12._time;
+      t02 = t12, t12 = t12._next;
     } else {
-      t2 = t1._next, t1._next = null;
-      t1 = t0 ? t0._next = t2 : taskHead = t2;
+      t22 = t12._next, t12._next = null;
+      t12 = t02 ? t02._next = t22 : taskHead = t22;
     }
   }
-  taskTail = t0;
+  taskTail = t02;
   sleep(time);
 }
 function sleep(time) {
@@ -1994,23 +2101,23 @@ function attrInterpolateNS(fullname, i) {
   };
 }
 function attrTweenNS(fullname, value) {
-  var t0, i0;
+  var t02, i0;
   function tween() {
     var i = value.apply(this, arguments);
     if (i !== i0)
-      t0 = (i0 = i) && attrInterpolateNS(fullname, i);
-    return t0;
+      t02 = (i0 = i) && attrInterpolateNS(fullname, i);
+    return t02;
   }
   tween._value = value;
   return tween;
 }
 function attrTween(name, value) {
-  var t0, i0;
+  var t02, i0;
   function tween() {
     var i = value.apply(this, arguments);
     if (i !== i0)
-      t0 = (i0 = i) && attrInterpolate(name, i);
-    return t0;
+      t02 = (i0 = i) && attrInterpolate(name, i);
+    return t02;
   }
   tween._value = value;
   return tween;
@@ -2295,12 +2402,12 @@ function textInterpolate(i) {
   };
 }
 function textTween(value) {
-  var t0, i0;
+  var t02, i0;
   function tween() {
     var i = value.apply(this, arguments);
     if (i !== i0)
-      t0 = (i0 = i) && textInterpolate(i);
-    return t0;
+      t02 = (i0 = i) && textInterpolate(i);
+    return t02;
   }
   tween._value = value;
   return tween;
@@ -2407,6 +2514,9 @@ Transition.prototype = transition.prototype = {
 };
 
 // node_modules/d3-ease/src/cubic.js
+function cubicOut(t) {
+  return --t * t * t + 1;
+}
 function cubicInOut(t) {
   return ((t *= 2) <= 1 ? t * t * t : (t -= 2) * t * t + 2) / 2;
 }
@@ -2929,6 +3039,13 @@ function transform(node) {
 }
 
 // main.ts
+function debounce(fn, delay) {
+  let timer2;
+  return () => {
+    clearTimeout(timer2);
+    timer2 = setTimeout(fn, delay);
+  };
+}
 var VIEW_TYPE_TREEMAP = "digital-garden-treemap-view";
 var TRANSLATIONS = {
   en: {
@@ -3044,6 +3161,7 @@ var DigitalGardenTreemapPlugin = class extends import_obsidian.Plugin {
     await this.saveData(this.settings);
     this.app.workspace.getLeavesOfType(VIEW_TYPE_TREEMAP).forEach((leaf) => {
       if (leaf.view instanceof TreemapView) {
+        leaf.view.invalidateCache();
         void leaf.view.refresh();
       }
     });
@@ -3071,7 +3189,22 @@ var TreemapView = class extends import_obsidian.ItemView {
     super(leaf);
     __publicField(this, "plugin");
     __publicField(this, "currentRootPath", "");
+    // --- Performance: Data Cache ---
+    __publicField(this, "hierarchyCache", null);
+    __publicField(this, "cacheValid", false);
+    // --- Performance: Resize Debounce ---
+    __publicField(this, "resizeObserver", null);
+    // --- Physics: Elastic Tooltip ---
     __publicField(this, "tooltipEl", null);
+    __publicField(this, "tooltipTargetX", 0);
+    __publicField(this, "tooltipTargetY", 0);
+    __publicField(this, "tooltipCurrentX", 0);
+    __publicField(this, "tooltipCurrentY", 0);
+    __publicField(this, "tooltipRafId", 0);
+    __publicField(this, "tooltipVisible", false);
+    __publicField(this, "tooltipIsRightAligned", false);
+    // --- Vault Event References ---
+    __publicField(this, "vaultEventRefs", []);
     this.plugin = plugin;
   }
   getViewType() {
@@ -3079,6 +3212,11 @@ var TreemapView = class extends import_obsidian.ItemView {
   }
   getDisplayText() {
     return "Treemap";
+  }
+  /** Mark data cache as stale */
+  invalidateCache() {
+    this.cacheValid = false;
+    this.hierarchyCache = null;
   }
   async onOpen() {
     await Promise.resolve();
@@ -3088,10 +3226,26 @@ var TreemapView = class extends import_obsidian.ItemView {
     container.createDiv({ cls: "treemap-controls-container" });
     const treemapContainer = container.createDiv({ cls: "treemap-container" });
     treemapContainer.classList.add("treemap-container-inner");
-    const resizeObserver = new ResizeObserver(() => {
+    const debouncedRefresh = debounce(() => {
       void this.refresh();
+    }, 150);
+    this.resizeObserver = new ResizeObserver(() => {
+      debouncedRefresh();
     });
-    resizeObserver.observe(treemapContainer);
+    this.resizeObserver.observe(treemapContainer);
+    const vault = this.app.vault;
+    const onVaultStructureChange = debounce(() => {
+      this.invalidateCache();
+      void this.refresh();
+    }, 300);
+    this.vaultEventRefs = [
+      vault.on("create", onVaultStructureChange),
+      vault.on("delete", onVaultStructureChange),
+      vault.on("rename", onVaultStructureChange),
+      vault.on("modify", debounce(() => {
+        this.invalidateCache();
+      }, 1e3))
+    ];
     void this.renderTreemap(treemapContainer);
   }
   renderControls(container) {
@@ -3145,6 +3299,7 @@ var TreemapView = class extends import_obsidian.ItemView {
     const rootLink = container.createSpan({ cls: "breadcrumb-item", text: "Vault" });
     rootLink.onclick = () => {
       this.currentRootPath = "";
+      this.invalidateCache();
       void this.refresh();
     };
     let currentPathAcc = "";
@@ -3155,6 +3310,7 @@ var TreemapView = class extends import_obsidian.ItemView {
       const link = container.createSpan({ cls: "breadcrumb-item", text: segment });
       link.onclick = () => {
         this.currentRootPath = pathRef;
+        this.invalidateCache();
         void this.refresh();
       };
     });
@@ -3165,6 +3321,11 @@ var TreemapView = class extends import_obsidian.ItemView {
     if (container) {
       container.empty();
       this.tooltipEl = null;
+      this.tooltipVisible = false;
+      if (this.tooltipRafId) {
+        cancelAnimationFrame(this.tooltipRafId);
+        this.tooltipRafId = 0;
+      }
       void this.renderTreemap(container);
     }
     const controlsContainer = this.containerEl.querySelector(".treemap-controls-container");
@@ -3179,7 +3340,7 @@ var TreemapView = class extends import_obsidian.ItemView {
     const root2 = hierarchy(data).sum((d) => d.value || 0).sort((a, b) => (b.value || 0) - (a.value || 0));
     treemap_default().size([width, height]).paddingInner(4).paddingOuter(4).paddingTop(24)(root2);
     const svg = select_default2(container).append("svg").attr("width", width).attr("height", height).style("font-family", "inherit");
-    const transition2 = transition().duration(400);
+    const transition2 = transition().duration(500).ease(cubicOut);
     const nodes = svg.selectAll("g").data(root2.descendants()).join(
       (enter) => enter.append("g").attr("transform", (d) => `translate(${d.x0},${d.y0})`).style("opacity", 0).call((enter2) => enter2.transition(transition2).style("opacity", 1)),
       (update) => update.call((update2) => update2.transition(transition2).attr("transform", (d) => `translate(${d.x0},${d.y0})`)),
@@ -3192,11 +3353,16 @@ var TreemapView = class extends import_obsidian.ItemView {
         this.showTooltip(event, d);
       }
     }).on("mousemove", (event) => {
-      this.moveTooltip(event);
+      this.updateTooltipTarget(event);
     }).on("mouseleave", () => {
       this.hideTooltip();
     }).on("click", (event, d) => {
-      if (d.data.path.endsWith(".md")) {
+      if (d.data.children) {
+        event.stopPropagation();
+        this.currentRootPath = d.data.path;
+        this.invalidateCache();
+        void this.refresh();
+      } else if (d.data.path.endsWith(".md")) {
         const file = this.app.vault.getAbstractFileByPath(d.data.path);
         if (file instanceof import_obsidian.TFile) {
           void this.app.workspace.getLeaf().openFile(file);
@@ -3208,34 +3374,34 @@ var TreemapView = class extends import_obsidian.ItemView {
       const h = d.y1 - d.y0;
       return d.data.children ? w > 60 && h > 25 : w > 36 && h > 18;
     }).append("foreignObject").attr("width", (d) => Math.max(0, d.x1 - d.x0)).attr("height", (d) => Math.max(0, d.y1 - d.y0)).style("pointer-events", "none").append("xhtml:div").attr("class", (d) => `treemap-node-label-container ${d.data.children ? "is-folder" : "is-leaf"}`).each((d, i, selection2) => {
-      const container2 = selection2[i];
+      const labelContainer = selection2[i];
       const isFolder = !!d.data.children;
-      let displayName = d.data.name;
-      if (!isFolder && !this.plugin.settings.showTitle) {
-        displayName = "***";
-      } else if (!isFolder && displayName.length > 10) {
-        displayName = displayName.substring(0, 10) + "\u2026";
+      const isMoreNode = d.data.path.endsWith("/_more");
+      const isPrivacyActive = !isFolder && !this.plugin.settings.showTitle && !isMoreNode;
+      if (isPrivacyActive) {
+        labelContainer.classList.add("is-privacy-blur");
       }
-      container2.createDiv({
+      const titleEl = labelContainer.createDiv({
         cls: "treemap-node-title",
-        text: displayName,
-        attr: { title: d.data.name }
+        text: d.data.name,
+        attr: { title: isPrivacyActive ? "" : d.data.name }
       });
+      if (!isFolder) {
+        titleEl.classList.add("has-fade-truncation");
+      }
       if (isFolder && (d.depth === 1 || d.depth === 2)) {
-        container2.createDiv({
+        labelContainer.createDiv({
           cls: "treemap-node-badge",
           text: String(d.data.childCount)
         });
       }
-    }).on("click", (event, d) => {
-      if (d.data.children) {
-        event.stopPropagation();
-        this.currentRootPath = d.data.path;
-        void this.refresh();
+      if (isMoreNode) {
+        labelContainer.classList.add("is-more-indicator");
       }
     });
     nodes.filter((d) => d.data.path.endsWith("/_more")).style("pointer-events", "none").style("opacity", "0.8");
   }
+  // --- Tooltip System: Elastic Spring Physics ---
   showTooltip(event, d) {
     var _a;
     if (!this.tooltipEl) {
@@ -3251,28 +3417,73 @@ var TreemapView = class extends import_obsidian.ItemView {
       text: `${this.plugin.t("node_level")} ${d.depth}`,
       cls: "is-muted"
     });
-    this.moveTooltip(event);
+    const offset = 12;
+    const winWidth = window.innerWidth;
+    this.tooltipIsRightAligned = event.clientX > winWidth / 2;
+    if (this.tooltipIsRightAligned) {
+      this.tooltipTargetX = winWidth - event.clientX + offset;
+    } else {
+      this.tooltipTargetX = event.clientX + offset;
+    }
+    this.tooltipTargetY = event.clientY + offset;
+    this.tooltipCurrentX = this.tooltipTargetX;
+    this.tooltipCurrentY = this.tooltipTargetY;
+    this.tooltipVisible = true;
+    this.applyTooltipPosition();
+    this.startTooltipAnimation();
   }
-  moveTooltip(event) {
-    if (!this.tooltipEl)
+  updateTooltipTarget(event) {
+    if (!this.tooltipVisible)
       return;
     const offset = 12;
     const winWidth = window.innerWidth;
-    if (event.clientX > winWidth / 2) {
+    this.tooltipIsRightAligned = event.clientX > winWidth / 2;
+    if (this.tooltipIsRightAligned) {
+      this.tooltipTargetX = winWidth - event.clientX + offset;
+    } else {
+      this.tooltipTargetX = event.clientX + offset;
+    }
+    this.tooltipTargetY = event.clientY + offset;
+  }
+  startTooltipAnimation() {
+    if (this.tooltipRafId)
+      return;
+    const animate = () => {
+      if (!this.tooltipVisible) {
+        this.tooltipRafId = 0;
+        return;
+      }
+      const lerpFactor = 0.12;
+      this.tooltipCurrentX += (this.tooltipTargetX - this.tooltipCurrentX) * lerpFactor;
+      this.tooltipCurrentY += (this.tooltipTargetY - this.tooltipCurrentY) * lerpFactor;
+      this.applyTooltipPosition();
+      this.tooltipRafId = requestAnimationFrame(animate);
+    };
+    this.tooltipRafId = requestAnimationFrame(animate);
+  }
+  applyTooltipPosition() {
+    if (!this.tooltipEl)
+      return;
+    if (this.tooltipIsRightAligned) {
       this.tooltipEl.addClass("is-right-aligned");
       this.tooltipEl.setCssProps({
-        "--tooltip-y": `${event.clientY + offset}px`,
-        "--tooltip-right-x": `${winWidth - event.clientX + offset}px`
+        "--tooltip-y": `${this.tooltipCurrentY}px`,
+        "--tooltip-right-x": `${this.tooltipCurrentX}px`
       });
     } else {
       this.tooltipEl.removeClass("is-right-aligned");
       this.tooltipEl.setCssProps({
-        "--tooltip-y": `${event.clientY + offset}px`,
-        "--tooltip-x": `${event.clientX + offset}px`
+        "--tooltip-y": `${this.tooltipCurrentY}px`,
+        "--tooltip-x": `${this.tooltipCurrentX}px`
       });
     }
   }
   hideTooltip() {
+    this.tooltipVisible = false;
+    if (this.tooltipRafId) {
+      cancelAnimationFrame(this.tooltipRafId);
+      this.tooltipRafId = 0;
+    }
     if (this.tooltipEl) {
       this.tooltipEl.classList.add("is-hidden");
     }
@@ -3296,9 +3507,9 @@ var TreemapView = class extends import_obsidian.ItemView {
     const base = this.getEffectiveColor("base");
     const clampedT = Math.max(0, Math.min(1, t));
     if (clampedT < 0.5) {
-      return hsl_default(fresh, growth)(clampedT * 2);
+      return hcl_default(fresh, growth)(clampedT * 2);
     } else {
-      return hsl_default(growth, base)((clampedT - 0.5) * 2);
+      return hcl_default(growth, base)((clampedT - 0.5) * 2);
     }
   }
   getEffectiveColor(type2) {
@@ -3329,6 +3540,9 @@ var TreemapView = class extends import_obsidian.ItemView {
     return classes.join(" ");
   }
   async buildHierarchy() {
+    if (this.cacheValid && this.hierarchyCache) {
+      return this.hierarchyCache;
+    }
     let targetFolder = null;
     if (this.currentRootPath) {
       const abstractFile = this.app.vault.getAbstractFileByPath(this.currentRootPath);
@@ -3340,7 +3554,10 @@ var TreemapView = class extends import_obsidian.ItemView {
       targetFolder = this.app.vault.getRoot();
       this.currentRootPath = "";
     }
-    return this.processFolder(targetFolder, 0);
+    const result = await this.processFolder(targetFolder, 0);
+    this.hierarchyCache = result;
+    this.cacheValid = true;
+    return result;
   }
   async processFolder(folder, depth) {
     var _a, _b, _c;
@@ -3435,8 +3652,20 @@ var TreemapView = class extends import_obsidian.ItemView {
   }
   async onClose() {
     if (this.tooltipEl) {
-      await this.tooltipEl.remove();
+      this.tooltipEl.remove();
+      this.tooltipEl = null;
     }
+    if (this.tooltipRafId) {
+      cancelAnimationFrame(this.tooltipRafId);
+      this.tooltipRafId = 0;
+    }
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    this.vaultEventRefs.forEach((ref) => this.app.vault.offref(ref));
+    this.vaultEventRefs = [];
+    this.invalidateCache();
   }
 };
 var DigitalGardenSettingTab = class extends import_obsidian.PluginSettingTab {
