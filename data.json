@@ -22,5 +22,5 @@
   "locale": "zh",
   "sizingStrategy": "equal",
   "newFileDaysThreshold": 7,
-  "showTitle": false
+  "showTitle": true
 }

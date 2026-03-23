@@ -668,7 +668,7 @@ class TreemapView extends ItemView {
 			winter: { base: 'hsla(200, 15%, 85%, 0.3)', fresh: 'hsla(210, 80%, 75%, 0.8)', growth: 'hsla(205, 40%, 60%, 0.6)' }
 		};
 
-		return presets[palette as keyof typeof presets][type];
+		return presets[palette][type];
 	}
 
 	private getNodeClass(d: d3.HierarchyRectangularNode<TreemapNode>): string {
@@ -820,7 +820,8 @@ class TreemapView extends ItemView {
 		return node;
 	}
 
-	async onClose() {
+	async onClose(): Promise<void> {
+		await Promise.resolve();
 		// Cleanup tooltip
 		if (this.tooltipEl) {
 			this.tooltipEl.remove();

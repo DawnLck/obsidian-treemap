@@ -3651,6 +3651,7 @@ var TreemapView = class extends import_obsidian.ItemView {
     return node;
   }
   async onClose() {
+    await Promise.resolve();
     if (this.tooltipEl) {
       this.tooltipEl.remove();
       this.tooltipEl = null;
